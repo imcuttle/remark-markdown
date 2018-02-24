@@ -1,105 +1,92 @@
 'use strict'
-var openCloseTag = require('./utils/html').openCloseTag
-module.exports = breaks
+var visit = require('unist-util-visit')
+var parse = require('remark-parse')
+var elements = require('remark-parse/lib/block-elements')
+module.exports = markdown
 
-function breaks(options) {
+function markdown(options) {
   options = options || {}
-  var wrap = 'wrap' in options ? options.wrap : 'markdown'
-  var parser = this.Parser
-  var compiler = this.Compiler
-  var tokenizers
-  var methods
-  /* istanbul ignore if - never used (yet) */
-  if (!isRemarkParser(parser)) {
-    throw new Error('Missing parser to attach `remark-markdown` to')
-  }
+  var self = this
 
-  tokenizers = parser.prototype.blockTokenizers
-  methods = parser.prototype.blockMethods
-  tokenizers.markdown = tokenizeMarkdown
-  methods.splice(methods.indexOf('html'), 0, 'markdown')
+  var parserOpt = Object.assign({ blocks: elements }, options)
+  parserOpt.blocks.push('markdown')
+  this.use(parse, parserOpt)
 
-  if (!isRemarkCompiler(compiler)) {
-    return
-  }
-
-  var visitors = compiler.prototype.visitors
-  visitors.markdownBlock = function (node) {
-    var contents = this.all(node)
-    return '<markdown>\n' + contents.join('\n') + '\n</markdown>'
-  }
-
-  function tokenizeMarkdown(eat, value, silent) {
-    var now
-    var $1
-    var $2
-    var match
-    var cRegex = /(<markdown>([^]+?)<\/markdown>)/i
-    var regex = new RegExp('^' + cRegex.source, 'i')
-    /* istanbul ignore if - never used (yet) */
-    if (silent) {
-      return true
-    }
-
-    if (regex.test(value)) {
-      $1 = RegExp.$1
-      $2 = RegExp.$2
-      now = eat.now()
-      var add = eat($1)
-      var exit = this.enterBlock()
-      var values = this.tokenizeBlock($2, now)
-      exit()
-
-      var d = add(
-        {
-          type: 'markdownBlock',
-          children: values,
-          data: {
-            hName: wrap
+  return function (node) {
+    visit(node, 'html', function (node, index, parent) {
+      var val = node.value
+      var prefix = ''
+      var openNum = 0
+      var i = 0
+      var len = val.length
+      var rest
+      var children = []
+      while (i < len) {
+        var ch = val.charAt(i)
+        rest = val.substring(i)
+        if (rest.startsWith('<markdown>')) {
+          i += 9
+          if (openNum > 0 && prefix) {
+            children = children.concat(self.parse(prefix))
+            prefix = ''
+          }
+          children.push({
+            type: 'html',
+            value: prefix + '<markdown>'
+          })
+          openNum++
+          prefix = ''
+        } else if (rest.startsWith('</markdown>')) {
+          i += 10
+          if (0 === openNum) {
+            children.push({
+              type: 'html',
+              value: prefix + '</markdown>'
+            })
+            prefix = ''
+          }
+          else {
+            openNum--
+            prefix && (
+              children = children.concat(
+                self.parse(prefix),
+                {
+                  type: 'html',
+                  value: '</markdown>'
+                }
+              )
+            )
+            prefix = ''
           }
         }
-      )
+        else {
+          prefix += ch
+        }
 
-      if (true === tokenizeMarkdown.__entry) {
-        return tokenizeMarkdown.call(this, eat, value.substring($1.length), silent)
-      }
-      return d
-    }
-
-    if (value && openCloseTag.test(value)) {
-      // var html
-      if (true === tokenizeMarkdown.__entry) {
-        delete tokenizeMarkdown.__entry
-        value = value.substring(0, openCloseTag.lastIndex)
-      }
-      match = value.match(cRegex)
-      if (match) {
-        tokenizeMarkdown.__entry = true
-        value = value.substring(0, match.index)
+        i++
       }
 
-      return eat(value)({
-        type: 'html',
-        value: value
-      })
-    }
+      if (openNum === 0) {
+        if (prefix) {
+          children.push({
+            type: 'html',
+            value: prefix
+          })
+        }
+      }
 
+      if (openNum === 0 && children.length) {
+        parent.children.splice.apply(
+          parent.children,
+          [
+            index,
+            1,
+          ].concat(
+            children
+          )
+        )
+      }
+    })
   }
 }
 
-function isRemarkParser(parser) {
-  return Boolean(
-    parser &&
-    parser.prototype &&
-    parser.prototype.inlineTokenizers &&
-    parser.prototype.inlineMethods
-  )
-}
-
-function isRemarkCompiler(compiler) {
-  return Boolean(
-    compiler &&
-    compiler.prototype &&
-    compiler.prototype.visitors
-  )
-}

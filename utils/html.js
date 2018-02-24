@@ -13,6 +13,7 @@ var processing = '<[?].*?[?]>'
 var declaration = '<![A-Za-z]+\\s+[^>]*>'
 var cdata = '<!\\[CDATA\\[[\\s\\S]*?\\]\\]>'
 
+exports.attribute = attribute
 exports.openCloseTag = new RegExp('^(?:' + openTag + '|' + closeTag + ')')
 exports.openTag = new RegExp('^(?:' + openTag + ')')
 

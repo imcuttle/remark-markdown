@@ -52,11 +52,14 @@ describe('main', function () {
       .use(mark)
       .process('<markdown>## h #x\n ## hh</markdown>', function (err, content) {
         expect(err).toBeNull()
-        expect(content.contents.trim()).toBe('<markdown><h2>h #x</h2><h2>hh</h2></markdown>')
+        expect(content.contents.trim()).toBe('<markdown>\n'
+                                             + '<h2>h #x</h2>\n'
+                                             + '<h2>hh</h2>\n'
+                                             + '</markdown>')
       })
   })
 
-  test('right block case 1', () => {
+  test('right block case', () => {
     remark()
       .use(html)
       .use(mark)
@@ -65,7 +68,10 @@ describe('main', function () {
                + '## hh\n'
                + '</markdown>', function (err, content) {
         expect(err).toBeNull()
-        expect(content.contents.trim()).toBe('<markdown><h2>h #x</h2><h2>hh</h2></markdown>')
+        expect(content.contents.trim()).toBe('<markdown>\n'
+                                             + '<h2>h #x</h2>\n'
+                                             + '<h2>hh</h2>\n'
+                                             + '</markdown>')
       })
   })
 
@@ -73,15 +79,28 @@ describe('main', function () {
     remark()
       .use(html)
       .use(mark)
-      .process('<span>abc</span><div>'
-               + '<span>a</span><markdown>\n'
+      .process('<span>abc</span>\n'
+               + '<div>'
+               + '<span>a</span>\n'
+               + '<markdown>\n'
                + '## hxx\n '
                + '## hh\n'
-               + '<p>abc</p>\n'
-               + '</markdown><span>abc</span></div>', function (err, content) {
+               + '<div>abc</div>\n'
+               + '</markdown>'
+               + '<span>abc</span>'
+               + '</div>', function (err, content) {
         expect(err).toBeNull()
         expect(content.contents.trim()).toBe(
-          '<span>abc</span><div><span>a</span>\n<markdown><h2>hxx</h2><h2>hh</h2><p>abc</p></markdown>\n<span>abc</span></div>'
+          '<p><span>abc</span></p>\n'
+          + '<div>'
+          + '<span>a</span>\n'
+          + '<markdown>\n'
+          + '<h2>hxx</h2>\n'
+          + '<h2>hh</h2>\n'
+          + '<div>abc</div>\n'
+          + '</markdown>\n'
+          + '<span>abc</span>'
+          + '</div>'
         )
       })
   })
@@ -91,55 +110,35 @@ describe('main', function () {
       .use(html)
       .use(mark)
       .process('<span>xxx</span></div>', function (err, content) {
-        expect(content.contents.trim()).toBe('<span>xxx</span></div>')
+        expect(content.contents.trim()).toBe('<p><span>xxx</span></div></p>')
       })
   })
 
   test('block html ', () => {
-    remark()
-      .use(html)
-      .use(mark)
-      .process('<div><span>xxx</span></div>', function (err, content) {
-        expect(content.contents.trim()).toBe('<div><span>xxx</span></div>')
-      })
 
     remark()
       .use(html)
       .use(mark)
-      .process('<div><span>xxx<markdown># a</markdown><markdown># b</markdown></span></div>', function (err, content) {
-        expect(content.contents.trim()).toBe('<div><span>xxx\n<markdown><h1>a</h1></markdown>\n<markdown><h1>b</h1></markdown>\n\n</span></div>')
+      .process('<div><span>xxx<markdown># a</markdown>hh<markdown># b</markdown></span></div>', function (err, content) {
+        expect(content.contents.trim()).toBe('<div><span>xxx<markdown>\n'
+                                             + '<h1>a</h1>\n'
+                                             + '</markdown>\n'
+                                             + 'hh'
+                                             + '<markdown>\n'
+                                             + '<h1>b</h1>\n'
+                                             + '</markdown>\n'
+                                             + '</span></div>')
       })
   })
 
-  test('customized options', () => {
+
+  test('complicated', function () {
+    var str = require('fs').readFileSync(__dirname + '/fixture/main.md').toString()
     remark()
       .use(html)
-      .use(mark, { wrap: 'div' })
-      .process('<markdown>## h #x\n ## hh</markdown>', function (err, content) {
-        expect(err).toBeNull()
-        expect(content.contents.trim()).toBe('<div><h2>h #x</h2><h2>hh</h2></div>')
+      .use(mark)
+      .process(str, function (err, con) {
+        expect(con.contents).toMatchSnapshot()
       })
   })
-
-  test('stringify', () => {
-    remark()
-      .use(mark, { wrap: 'div' })
-      .process('<markdown>## h #x ## hh</markdown>', function (err, content) {
-        expect(err).toBeNull()
-        expect(content.contents.trim()).toBe('<markdown>\n## h #x ## hh\n</markdown>')
-      })
-  })
-
-  test('stringify case 1', () => {
-    remark()
-      .use(mark, { wrap: 'div' })
-      .process('<div><markdown>\n'
-               + '## h #x \n'
-               + '## hh \n'
-               + '</markdown></div>\n', function (err, content) {
-        expect(err).toBeNull()
-        expect(content.contents.trim()).toBe('<div>\n\n<markdown>\n## h #x\n## hh\n</markdown>\n\n\n\n</div>')
-      })
-  })
-
 })
